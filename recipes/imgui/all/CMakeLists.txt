@@ -11,6 +11,18 @@ file(GLOB EXTRA_FONTS_FILES ${EXTRA_FONTS_DIR}/*.ttf)
 if (MSVC)
     file(GLOB EXTRA_NATVIS_FILES ${MISC_DIR}/natvis/*.natvis)
 endif()
+if(${IMGUI_ENABLE_CPP})
+    list(APPEND SOURCE_FILES ${IMGUI_SRC_DIR}/misc/cpp/imgui_stdlib.cpp)
+    list(APPEND HEADER_FILES ${IMGUI_SRC_DIR}/misc/cpp/imgui_stdlib.h)
+endif()
+if(${IMGUI_WITH_FREETYPE})
+    find_package(Freetype REQUIRED)
+    list(APPEND SOURCE_FILES ${IMGUI_SRC_DIR}/misc/freetype/imgui_freetype.cpp)
+    list(APPEND HEADER_FILES ${IMGUI_SRC_DIR}/misc/freetype/imgui_freetype.h)
+endif()
+if(${IMGUI_WITH_LUNASVG})
+    find_package(lunasvg REQUIRED CONFIG)
+endif()
 
 set(BINARY_TO_COMPRESSED_BIN binary_to_compressed_c)
 
@@ -18,6 +30,12 @@ add_executable(${BINARY_TO_COMPRESSED_BIN} ${EXTRA_FONTS_DIR}/binary_to_compress
 target_compile_features(${BINARY_TO_COMPRESSED_BIN} PRIVATE cxx_std_11)
 
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
+if(${IMGUI_WITH_FREETYPE})
+    target_link_libraries(${PROJECT_NAME} PUBLIC Freetype::Freetype)
+endif()
+if(${IMGUI_WITH_LUNASVG})
+    target_link_libraries(${PROJECT_NAME} PUBLIC lunasvg::lunasvg)
+endif()
 set_target_properties(${PROJECT_NAME} PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
@@ -29,6 +47,8 @@ generate_export_header(${PROJECT_NAME}
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${IMGUI_SRC_DIR}>
+    $<$<BOOL:${IMGUI_ENABLE_CPP}>:$<BUILD_INTERFACE:${IMGUI_SRC_DIR}/misc/cpp>>
+    $<$<BOOL:${IMGUI_WITH_FREETYPE}>:$<BUILD_INTERFACE:${IMGUI_SRC_DIR}/misc/freetype>>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     $<INSTALL_INTERFACE:include>
 )

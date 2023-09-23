@@ -2,6 +2,7 @@ from conan import ConanFile
 from conan.tools.files import get, copy, replace_in_file
 from conan.tools.scm import Version
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conans.errors import ConanInvalidConfiguration
 import os
 import re
 
@@ -21,11 +22,25 @@ class IMGUIConan(ConanFile):
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
+        "enable_cpp": [True, False],
+        "with_freetype": [True, False],
+        "with_lunasvg": [True, False],
     }
     default_options = {
         "shared": False,
         "fPIC": True,
+        "enable_cpp": False,
+        "with_freetype": False,
+        "with_lunasvg": False
     }
+
+    def requirements(self):
+        if self.options.with_lunasvg and not self.options.with_freetype:
+            raise ConanInvalidConfiguration("for imgui with_lunasvg also requires with_freetype");
+        if self.options.with_freetype:
+            self.requires("freetype/2.13.0")
+        if self.options.with_lunasvg:
+            self.requires("lunasvg/2.3.8")
 
     def export_sources(self):
         copy(self, "CMakeLists.txt", self.recipe_folder, self.export_sources_folder)
@@ -47,6 +62,9 @@ class IMGUIConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.variables["IMGUI_SRC_DIR"] = self.source_folder.replace("\\", "/")
+        tc.variables["IMGUI_ENABLE_CPP"] = "TRUE" if self.options.enable_cpp else "FALSE"
+        tc.variables["IMGUI_WITH_FREETYPE"] = "TRUE" if self.options.with_freetype else "FALSE"
+        tc.variables["IMGUI_WITH_LUNASVG"] = "TRUE" if self.options.with_lunasvg else "FALSE"
         tc.generate()
 
     def _patch_sources(self):
@@ -56,6 +74,20 @@ class IMGUIConan(ConanFile):
             "#ifdef IMGUI_USER_CONFIG",
             "#include \"imgui_export_headers.h\"\n\n#ifdef IMGUI_USER_CONFIG"
         )
+
+        # Enable optional features in imconfig.h when appropriate
+        if self.options.with_freetype:
+            replace_in_file(self,
+                os.path.join(self.source_folder, "imconfig.h"),
+                "#pragma once",
+                "#pragma once\n\n#define IMGUI_ENABLE_FREETYPE\n"
+            )
+        if self.options.with_lunasvg:
+            replace_in_file(self,
+                os.path.join(self.source_folder, "imconfig.h"),
+                "#pragma once",
+                "#pragma once\n\n#define IMGUI_ENABLE_FREETYPE_LUNASVG\n"
+            )
 
     def build(self):
         self._patch_sources()
